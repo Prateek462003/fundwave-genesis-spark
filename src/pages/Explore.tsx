@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Search } from "lucide-react";
+import { ethers } from "ethers";
 
 const Explore = () => {
   const { campaigns, fetchCampaigns, loadingCampaigns } = useWeb3();
