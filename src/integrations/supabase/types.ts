@@ -9,13 +9,86 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      campaigns: {
+        Row: {
+          amount_collected: string | null
+          claimed: boolean | null
+          created_at: string
+          creator_address: string
+          deadline: number
+          description: string
+          id: string
+          image_url: string | null
+          target_amount: string
+          title: string
+        }
+        Insert: {
+          amount_collected?: string | null
+          claimed?: boolean | null
+          created_at?: string
+          creator_address: string
+          deadline: number
+          description: string
+          id?: string
+          image_url?: string | null
+          target_amount: string
+          title: string
+        }
+        Update: {
+          amount_collected?: string | null
+          claimed?: boolean | null
+          created_at?: string
+          creator_address?: string
+          deadline?: number
+          description?: string
+          id?: string
+          image_url?: string | null
+          target_amount?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      donations: {
+        Row: {
+          amount: string
+          campaign_id: string
+          created_at: string
+          donor_address: string
+          id: string
+        }
+        Insert: {
+          amount: string
+          campaign_id: string
+          created_at?: string
+          donor_address: string
+          id?: string
+        }
+        Update: {
+          amount?: string
+          campaign_id?: string
+          created_at?: string
+          donor_address?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      set_current_wallet_address: {
+        Args: { address: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

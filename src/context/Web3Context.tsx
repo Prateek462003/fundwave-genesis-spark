@@ -1,7 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ethers } from 'ethers';
 import Web3Modal from 'web3modal';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 // ABI for our smart contract (simplified version for demo)
 const crowdfundingAbi = [
@@ -14,7 +16,7 @@ const crowdfundingAbi = [
 ];
 
 interface Campaign {
-  id: number;
+  id: string;
   creator: string;
   title: string;
   description: string;
@@ -22,7 +24,7 @@ interface Campaign {
   amountCollected: string;
   deadline: number;
   claimed: boolean;
-  imageUrl?: string; // For UI purposes
+  imageUrl?: string;
 }
 
 interface Web3ContextType {
@@ -35,8 +37,8 @@ interface Web3ContextType {
   loadingCampaigns: boolean;
   fetchCampaigns: () => Promise<void>;
   createCampaign: (title: string, description: string, target: string, deadline: number, imageUrl: string) => Promise<boolean>;
-  donateToCampaign: (id: number, amount: string) => Promise<boolean>;
-  myDonations: { id: number, amount: string }[];
+  donateToCampaign: (id: string, amount: string) => Promise<boolean>;
+  myDonations: { id: string, amount: string }[];
   myCampaigns: Campaign[];
   isCorrectNetwork: boolean;
   switchNetwork: () => Promise<void>;
@@ -56,48 +58,11 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
-  const [myDonations, setMyDonations] = useState<{ id: number; amount: string }[]>([]);
+  const [myDonations, setMyDonations] = useState<{ id: string; amount: string }[]>([]);
   const [myCampaigns, setMyCampaigns] = useState<Campaign[]>([]);
   const [isCorrectNetwork, setIsCorrectNetwork] = useState(true);
   
   const { toast } = useToast();
-
-  // Mock campaigns for the demo
-  const mockCampaigns: Campaign[] = [
-    {
-      id: 1,
-      creator: '0xabcd...1234',
-      title: 'Decentralized Art Gallery',
-      description: 'Creating a platform for artists to showcase and sell their digital art as NFTs without high marketplace fees.',
-      targetAmount: ethers.utils.parseEther('10').toString(),
-      amountCollected: ethers.utils.parseEther('4').toString(),
-      deadline: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days from now
-      claimed: false,
-      imageUrl: 'https://images.unsplash.com/photo-1561214115-f2f134cc4912'
-    },
-    {
-      id: 2,
-      creator: '0xefgh...5678',
-      title: 'Community Solar Project',
-      description: 'Funding a community-owned solar farm that will provide clean energy and share profits with token holders.',
-      targetAmount: ethers.utils.parseEther('50').toString(),
-      amountCollected: ethers.utils.parseEther('25').toString(),
-      deadline: Date.now() + 60 * 24 * 60 * 60 * 1000, // 60 days from now
-      claimed: false,
-      imageUrl: 'https://images.unsplash.com/photo-1566793474285-2decf0fc182a'
-    },
-    {
-      id: 3,
-      creator: '0xijkl...9012',
-      title: 'Blockchain Game Development',
-      description: 'Building an open-world RPG with blockchain integration for true ownership of in-game assets.',
-      targetAmount: ethers.utils.parseEther('30').toString(),
-      amountCollected: ethers.utils.parseEther('10').toString(),
-      deadline: Date.now() + 45 * 24 * 60 * 60 * 1000, // 45 days from now
-      claimed: false,
-      imageUrl: 'https://images.unsplash.com/photo-1556438064-2d7646166914'
-    }
-  ];
 
   const initWeb3Modal = () => {
     return new Web3Modal({
@@ -125,15 +90,18 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, crowdfundingAbi, signer);
       setContract(contract);
       
+      // Set the current wallet address in Supabase session
+      if (address) {
+        await supabase.rpc('set_current_wallet_address', { address });
+      }
+      
       toast({
         title: "Wallet connected",
         description: "Your wallet has been connected successfully.",
       });
 
-      // For demo purposes, we'll set mock data
-      setCampaigns(mockCampaigns);
-      setMyDonations([{ id: 1, amount: ethers.utils.parseEther('2').toString() }]);
-      setMyCampaigns([mockCampaigns[0]]);
+      // Load user campaigns and donations
+      fetchCampaigns();
       
       // Listen for account changes
       window.ethereum?.on("accountsChanged", handleAccountChange);
@@ -155,6 +123,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     setAccount(null);
     setProvider(null);
     setContract(null);
+    setMyCampaigns([]);
+    setMyDonations([]);
     
     const web3Modal = initWeb3Modal();
     web3Modal.clearCachedProvider();
@@ -172,6 +142,14 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
   const handleAccountChange = (accounts: string[]) => {
     if (accounts.length > 0) {
       setAccount(accounts[0]);
+      // Update the current wallet address in Supabase session
+      if (accounts[0]) {
+        supabase.rpc('set_current_wallet_address', { address: accounts[0] })
+          .then(() => {
+            // Refresh campaigns and donations when account changes
+            fetchCampaigns();
+          });
+      }
     } else {
       disconnectWallet();
     }
@@ -207,26 +185,68 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchCampaigns = async () => {
-    if (!contract) return;
-    
     try {
       setLoadingCampaigns(true);
       
-      // In a real implementation, we'd fetch from blockchain
-      // For demo, we'll use our mock data
-      setTimeout(() => {
-        setCampaigns(mockCampaigns);
-        setLoadingCampaigns(false);
-      }, 1000);
+      // Fetch all campaigns from Supabase
+      const { data: campaignsData, error: campaignsError } = await supabase
+        .from('campaigns')
+        .select('*');
       
+      if (campaignsError) {
+        throw campaignsError;
+      }
+      
+      if (campaignsData) {
+        const formattedCampaigns: Campaign[] = campaignsData.map(campaign => ({
+          id: campaign.id,
+          creator: campaign.creator_address,
+          title: campaign.title,
+          description: campaign.description,
+          targetAmount: campaign.target_amount,
+          amountCollected: campaign.amount_collected || '0',
+          deadline: campaign.deadline,
+          claimed: campaign.claimed || false,
+          imageUrl: campaign.image_url
+        }));
+        
+        setCampaigns(formattedCampaigns);
+        
+        // If account is connected, filter my campaigns
+        if (account) {
+          const myCampaignsData = formattedCampaigns.filter(
+            campaign => campaign.creator.toLowerCase() === account.toLowerCase()
+          );
+          setMyCampaigns(myCampaignsData);
+          
+          // Fetch my donations
+          const { data: donationsData, error: donationsError } = await supabase
+            .from('donations')
+            .select('*')
+            .eq('donor_address', account);
+            
+          if (donationsError) {
+            throw donationsError;
+          }
+          
+          if (donationsData) {
+            const myDonationsFormatted = donationsData.map(donation => ({
+              id: donation.campaign_id,
+              amount: donation.amount
+            }));
+            setMyDonations(myDonationsFormatted);
+          }
+        }
+      }
     } catch (error) {
       console.error("Error fetching campaigns:", error);
-      setLoadingCampaigns(false);
       toast({
         title: "Error",
         description: "Failed to fetch campaigns. Please try again later.",
         variant: "destructive",
       });
+    } finally {
+      setLoadingCampaigns(false);
     }
   };
 
@@ -237,7 +257,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     deadline: number,
     imageUrl: string
   ): Promise<boolean> => {
-    if (!provider || !account) {
+    if (!account) {
       toast({
         title: "Not Connected",
         description: "Please connect your wallet first.",
@@ -258,7 +278,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     try {
       // For demo/testing - directly trigger a wallet transaction
       // This will open the wallet popup even without a real contract
-      const signer = provider.getSigner();
+      const signer = provider!.getSigner();
       
       toast({
         title: "Creating Campaign",
@@ -271,24 +291,29 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
       await signer.sendTransaction({
         to: burnAddress,
         value: ethers.utils.parseEther("0"),
-        // No data field here to avoid the error
       });
       
-      // Once the transaction is approved, we add to our mock campaigns
-      const newCampaign: Campaign = {
-        id: campaigns.length + 1,
-        creator: account,
-        title,
-        description,
-        targetAmount: ethers.utils.parseEther(target).toString(),
-        amountCollected: "0",
-        deadline,
-        claimed: false,
-        imageUrl
-      };
+      // Once the transaction is approved, create campaign in Supabase
+      const { data: campaign, error } = await supabase
+        .from('campaigns')
+        .insert([
+          {
+            creator_address: account,
+            title,
+            description,
+            target_amount: ethers.utils.parseEther(target).toString(),
+            deadline,
+            image_url: imageUrl
+          }
+        ])
+        .select();
       
-      setCampaigns([...campaigns, newCampaign]);
-      setMyCampaigns([...myCampaigns, newCampaign]);
+      if (error) {
+        throw error;
+      }
+      
+      // Refresh campaigns list
+      fetchCampaigns();
       
       toast({
         title: "Success!",
@@ -307,8 +332,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const donateToCampaign = async (id: number, amount: string): Promise<boolean> => {
-    if (!provider || !account) {
+  const donateToCampaign = async (id: string, amount: string): Promise<boolean> => {
+    if (!account) {
       toast({
         title: "Not Connected",
         description: "Please connect your wallet first.",
@@ -327,7 +352,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const signer = provider.getSigner();
+      const signer = provider!.getSigner();
       const ethAmount = ethers.utils.parseEther(amount);
       
       toast({
@@ -335,51 +360,56 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
         description: "Please confirm the transaction in your wallet.",
       });
       
-      // To simulate a donation but actually use test ETH, we'll send to the contract address
-      // In a real app, this would call the contract's donation function
-      // For testing, we'll direct the funds to a safe recipient (like the contract address)
-      // or to a burn address so we don't use actual funds
-      
+      // To simulate a donation but actually use test ETH, we'll send to a burn address
       const burnAddress = "0x000000000000000000000000000000000000dEaD";
       
-      // Now send the transaction with real ETH value but no data
+      // Send the transaction with real ETH value
       await signer.sendTransaction({
-        to: burnAddress, // Using burn address for testing
-        value: ethAmount, // Actual ETH amount from user input
-        // No data field to avoid the error
+        to: burnAddress,
+        value: ethAmount,
       });
       
-      // Update our mock campaigns
-      const updatedCampaigns = campaigns.map(campaign => {
-        if (campaign.id === id) {
-          const currentAmount = ethers.BigNumber.from(campaign.amountCollected);
-          return {
-            ...campaign,
-            amountCollected: currentAmount.add(ethAmount).toString()
-          };
-        }
-        return campaign;
-      });
+      // Get current amount collected
+      const { data: campaignData, error: fetchError } = await supabase
+        .from('campaigns')
+        .select('amount_collected')
+        .eq('id', id)
+        .single();
       
-      setCampaigns(updatedCampaigns);
-      
-      // Update donations
-      const existingDonation = myDonations.find(d => d.id === id);
-      if (existingDonation) {
-        const updatedDonations = myDonations.map(d => {
-          if (d.id === id) {
-            const currentAmount = ethers.BigNumber.from(d.amount);
-            return {
-              ...d,
-              amount: currentAmount.add(ethAmount).toString()
-            };
-          }
-          return d;
-        });
-        setMyDonations(updatedDonations);
-      } else {
-        setMyDonations([...myDonations, { id, amount: ethAmount.toString() }]);
+      if (fetchError) {
+        throw fetchError;
       }
+      
+      // Update campaign amount collected
+      const currentAmount = ethers.BigNumber.from(campaignData.amount_collected || '0');
+      const newAmount = currentAmount.add(ethAmount).toString();
+      
+      const { error: updateError } = await supabase
+        .from('campaigns')
+        .update({ amount_collected: newAmount })
+        .eq('id', id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Record the donation
+      const { error: donationError } = await supabase
+        .from('donations')
+        .insert([
+          {
+            donor_address: account,
+            campaign_id: id,
+            amount: ethAmount.toString()
+          }
+        ]);
+      
+      if (donationError) {
+        throw donationError;
+      }
+      
+      // Refresh campaigns and donations
+      fetchCampaigns();
       
       toast({
         title: "Success!",
@@ -404,8 +434,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     if (web3Modal.cachedProvider) {
       connectWallet();
     } else {
-      // For demo purposes, we'll load mock campaigns even if not connected
-      setCampaigns(mockCampaigns);
+      // Fetch campaigns even if not connected
+      fetchCampaigns();
     }
   }, []);
 

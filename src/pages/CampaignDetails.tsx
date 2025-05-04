@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useWeb3 } from "@/context/Web3Context";
@@ -15,7 +14,7 @@ import { ArrowLeft, Clock, Users, PiggyBank } from "lucide-react";
 
 const CampaignDetails = () => {
   const { id } = useParams();
-  const campaignId = Number(id);
+  const campaignId = id; // Use the ID string directly from params
   const { campaigns, account, connectWallet, donateToCampaign, isCorrectNetwork, switchNetwork } = useWeb3();
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);
