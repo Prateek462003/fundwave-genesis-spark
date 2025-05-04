@@ -45,7 +45,8 @@ interface Web3ContextType {
 
 // For demo purposes - using Sepolia testnet
 const NETWORK_ID = 11155111;
-const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Replace with actual contract address
+// Replace with actual contract address when available
+const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; 
 
 const Web3Context = createContext<Web3ContextType | null>(null);
 
@@ -237,7 +238,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     deadline: number,
     imageUrl: string
   ): Promise<boolean> => {
-    if (!contract || !account) {
+    if (!provider || !account) {
       toast({
         title: "Not Connected",
         description: "Please connect your wallet first.",
@@ -256,18 +257,24 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // In a real implementation, we'd call the contract method
-      // For demo, we'll simulate success
+      // For demo/testing - directly trigger a wallet transaction
+      // This will open the wallet popup even without a real contract
+      const signer = provider.getSigner();
       
       toast({
         title: "Creating Campaign",
         description: "Please confirm the transaction in your wallet.",
       });
       
-      // Simulate transaction delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Instead of calling a real contract, we'll create a dummy transaction
+      // that will make MetaMask open but won't be sent to the network
+      await signer.sendTransaction({
+        to: account, // Sending to self
+        value: ethers.utils.parseEther("0"),
+        data: ethers.utils.toUtf8Bytes(`Create Campaign: ${title}`),
+      });
       
-      // Add to our mock campaigns
+      // Once the transaction is approved, we add to our mock campaigns
       const newCampaign: Campaign = {
         id: campaigns.length + 1,
         creator: account,
@@ -301,7 +308,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
   };
 
   const donateToCampaign = async (id: number, amount: string): Promise<boolean> => {
-    if (!contract || !account) {
+    if (!provider || !account) {
       toast({
         title: "Not Connected",
         description: "Please connect your wallet first.",
@@ -320,16 +327,20 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // In a real implementation, we'd call the contract method
-      // For demo, we'll simulate success
+      const signer = provider.getSigner();
       
       toast({
         title: "Processing Donation",
         description: "Please confirm the transaction in your wallet.",
       });
       
-      // Simulate transaction delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // For demo purposes, create a real transaction that opens the wallet
+      // Instead of sending to the contract, we'll just send a 0 ETH transaction with data
+      await signer.sendTransaction({
+        to: account, // Sending to self
+        value: ethers.utils.parseEther("0"), 
+        data: ethers.utils.toUtf8Bytes(`Donate to Campaign #${id}: ${amount} ETH`),
+      });
       
       // Update our mock campaigns
       const updatedCampaigns = campaigns.map(campaign => {
