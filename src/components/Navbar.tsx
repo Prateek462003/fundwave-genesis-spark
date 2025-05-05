@@ -20,10 +20,10 @@ const Navbar = () => {
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center">
           <div className="bg-gradient-to-r from-brand-purple to-brand-blue rounded-lg w-8 h-8 flex items-center justify-center mr-2">
-            <span className="text-white font-bold text-lg">F</span>
+            <span className="text-white font-bold text-lg">D</span>
           </div>
           <span className="font-bold text-xl bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-            FundWave
+            DevFund
           </span>
         </Link>
         

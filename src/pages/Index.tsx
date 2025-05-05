@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import HeroSection from "@/components/HeroSection";
 import FeatureSection from "@/components/FeatureSection";
@@ -7,6 +8,17 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
+
+// Define the Campaign type to fix the TypeScript error
+interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  targetAmount: string;
+  amountCollected: string;
+  deadline: number;
+}
 
 const Index = () => {
   const { campaigns } = useWeb3();

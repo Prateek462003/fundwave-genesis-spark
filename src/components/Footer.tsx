@@ -9,10 +9,10 @@ const Footer = () => {
           <div>
             <Link to="/" className="flex items-center mb-4">
               <div className="bg-gradient-to-r from-brand-purple to-brand-blue rounded-lg w-8 h-8 flex items-center justify-center mr-2">
-                <span className="text-white font-bold text-lg">F</span>
+                <span className="text-white font-bold text-lg">D</span>
               </div>
               <span className="font-bold text-xl bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                FundWave
+                DevFund
               </span>
             </Link>
             <p className="text-gray-600 mb-4">
@@ -112,7 +112,7 @@ const Footer = () => {
         </div>
         
         <div className="pt-8 mt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
-          <p>&copy; 2025 FundWave. All rights reserved.</p>
+          <p>&copy; 2025 DevFund. All rights reserved.</p>
           <p className="mt-2">This is a demo application running on the Sepolia testnet.</p>
         </div>
       </div>
