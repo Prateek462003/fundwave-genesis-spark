@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ethers } from "ethers";
 
 interface CampaignCardProps {
-  id: number;
+  id: string;
   title: string;
   description: string;
   imageUrl?: string;

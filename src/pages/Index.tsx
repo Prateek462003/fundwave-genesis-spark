@@ -1,20 +1,33 @@
-
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import HeroSection from "@/components/HeroSection";
 import FeatureSection from "@/components/FeatureSection";
 import CampaignCard from "@/components/CampaignCard";
 import { useWeb3 } from "@/context/Web3Context";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useNavigate } from "react-router-dom";
+import { ethers } from "ethers";
 
 const Index = () => {
-  const { campaigns, fetchCampaigns, loadingCampaigns } = useWeb3();
+  const { campaigns } = useWeb3();
+  const navigate = useNavigate();
+  const [featuredCampaigns, setFeaturedCampaigns] = useState<Campaign[]>([]);
   
   useEffect(() => {
-    fetchCampaigns();
-  }, []);
-  
-  const featuredCampaigns = campaigns.slice(0, 3);
+    if (campaigns.length > 0) {
+      // Get active campaigns and sort by amount collected percentage
+      const active = campaigns.filter(campaign => campaign.deadline > Date.now());
+      
+      // Sort by percentage funded and get top 3
+      const sorted = [...active].sort((a, b) => {
+        const percentA = parseFloat(ethers.utils.formatEther(a.amountCollected)) / parseFloat(ethers.utils.formatEther(a.targetAmount));
+        const percentB = parseFloat(ethers.utils.formatEther(b.amountCollected)) / parseFloat(ethers.utils.formatEther(b.targetAmount));
+        return percentB - percentA;
+      });
+      
+      setFeaturedCampaigns(sorted.slice(0, 3));
+    }
+  }, [campaigns]);
   
   return (
     <div>
@@ -31,11 +44,7 @@ const Index = () => {
             </p>
           </div>
           
-          {loadingCampaigns ? (
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-purple"></div>
-            </div>
-          ) : (
+          {featuredCampaigns.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredCampaigns.map((campaign) => (
                 <CampaignCard
@@ -49,6 +58,10 @@ const Index = () => {
                   deadline={campaign.deadline}
                 />
               ))}
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-purple"></div>
             </div>
           )}
         </div>

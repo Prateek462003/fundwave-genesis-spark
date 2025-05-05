@@ -352,7 +352,11 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const signer = provider!.getSigner();
+      if (!provider) {
+        throw new Error("Provider not initialized");
+      }
+
+      const signer = provider.getSigner();
       const ethAmount = ethers.utils.parseEther(amount);
       
       toast({
@@ -360,25 +364,25 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
         description: "Please confirm the transaction in your wallet.",
       });
       
-      // To simulate a donation but actually use test ETH, we'll send to a burn address
-      const burnAddress = "0x000000000000000000000000000000000000dEaD";
-      
-      // Send the transaction with real ETH value
-      await signer.sendTransaction({
-        to: burnAddress,
-        value: ethAmount,
-      });
-      
-      // Get current amount collected
+      // Get the campaign to find the creator address
       const { data: campaignData, error: fetchError } = await supabase
         .from('campaigns')
-        .select('amount_collected')
+        .select('creator_address, amount_collected')
         .eq('id', id)
         .single();
       
-      if (fetchError) {
-        throw fetchError;
+      if (fetchError || !campaignData) {
+        throw new Error("Failed to fetch campaign data");
       }
+      
+      // Send the actual ETH to the campaign creator
+      const tx = await signer.sendTransaction({
+        to: campaignData.creator_address,
+        value: ethAmount,
+      });
+      
+      // Wait for the transaction to be mined
+      await tx.wait();
       
       // Update campaign amount collected
       const currentAmount = ethers.BigNumber.from(campaignData.amount_collected || '0');
@@ -413,7 +417,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
       
       toast({
         title: "Success!",
-        description: `You have donated ${amount} ETH to this campaign.`,
+        description: `You have donated ${amount} ETH to this campaign. The funds have been sent to the creator.`,
       });
       
       return true;
