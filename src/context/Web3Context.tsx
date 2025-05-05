@@ -388,6 +388,7 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
       const currentAmount = ethers.BigNumber.from(campaignData.amount_collected || '0');
       const newAmount = currentAmount.add(ethAmount).toString();
       
+      // Update the campaign with the new amount collected
       const { error: updateError } = await supabase
         .from('campaigns')
         .update({ amount_collected: newAmount })
@@ -412,8 +413,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
         throw donationError;
       }
       
-      // Refresh campaigns and donations
-      fetchCampaigns();
+      // Refresh campaigns and donations immediately to update the UI
+      await fetchCampaigns();
       
       toast({
         title: "Success!",

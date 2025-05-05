@@ -15,19 +15,19 @@ import { ArrowLeft, Clock, Users, PiggyBank } from "lucide-react";
 const CampaignDetails = () => {
   const { id } = useParams();
   const campaignId = id as string; // Use the ID string directly from params
-  const { campaigns, account, connectWallet, donateToCampaign, isCorrectNetwork, switchNetwork } = useWeb3();
+  const { campaigns, account, connectWallet, donateToCampaign, isCorrectNetwork, switchNetwork, fetchCampaigns } = useWeb3();
   const [campaign, setCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [donationAmount, setDonationAmount] = useState("");
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
   
+  // Update campaign data whenever campaigns change
   useEffect(() => {
     const fetchCampaignDetails = async () => {
       setLoading(true);
       try {
-        // In a real app, we'd fetch this from the blockchain
-        // For demo, we'll just find it in our mock data
+        // Find the campaign in the updated campaigns list
         const foundCampaign = campaigns.find(c => c.id === campaignId);
         if (foundCampaign) {
           setCampaign(foundCampaign);
@@ -47,7 +47,7 @@ const CampaignDetails = () => {
     if (campaignId && campaigns.length > 0) {
       fetchCampaignDetails();
     }
-  }, [campaignId, campaigns]);
+  }, [campaignId, campaigns, toast]);
   
   const handleDonate = async () => {
     if (!account) {
@@ -82,6 +82,8 @@ const CampaignDetails = () => {
       const success = await donateToCampaign(campaignId, donationAmount);
       if (success) {
         setDonationAmount("");
+        // Refresh campaign details to show updated donation amount
+        await fetchCampaigns();
       }
     } catch (error) {
       console.error("Error donating:", error);
